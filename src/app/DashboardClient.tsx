@@ -1,21 +1,15 @@
 "use client";
 
-import { ChartWrapper } from "@/components/charts/ChartWrapper";
-import { DataTable } from "@/components/demo/DataTable";
-import { AlertDemo } from "@/components/demo/AlertDemo";
-import { ProgressDemo } from "@/components/demo/ProgressDemo";
-import { AccordionDemo } from "@/components/demo/AccordionDemo";
-import { TabsDemo } from "@/components/demo/TabsDemo";
+import { Dashboard } from "@/components/dashboard/Dashboard";
+import { widgetRegistry, availableWidgets } from "@/components/dashboard/widgets";
 
 export function DashboardClient() {
   return (
-    <div className="w-full max-w-4xl space-y-10">
-      <ChartWrapper />
-      <AlertDemo />
-      <ProgressDemo />
-      <DataTable />
-      <AccordionDemo />
-      <TabsDemo />
+    <div className="w-full">
+      <Dashboard 
+        widgetRegistry={widgetRegistry} 
+        availableWidgets={availableWidgets} 
+      />
     </div>
   );
 }

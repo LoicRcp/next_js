@@ -1,0 +1,38 @@
+.widget-container {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 300px;  /* Taille minimale pour éviter un trop petit widget */
+  min-height: 200px; /* Taille minimale pour éviter un trop petit widget */
+  overflow: hidden;
+}
+
+.widget-container > div {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* Désactiver le défilement dans les composants de widget */
+.widget-content {
+  overflow: visible !important;
+  height: auto !important;
+}
+
+/* Styles spécifiques pour certains widgets */
+.data-table-widget {
+  max-height: 100%;
+  overflow: hidden;
+}
+
+/* Animations douces pour les redimensionnements */
+.react-grid-item {
+  transition: all 200ms ease;
+}
+
+/* Styles d'état pour les widgets (en cours de redimensionnement) */
+.react-grid-item.resizing {
+  z-index: 2;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+}

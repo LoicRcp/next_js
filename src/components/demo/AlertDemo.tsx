@@ -5,7 +5,7 @@ import { Terminal } from "lucide-react"
 
 export function AlertDemo() {
   return (
-    <div className="w-full max-w-4xl space-y-4">
+    <div className="space-y-4 h-full">
       <Alert>
         <Terminal className="h-4 w-4" />
         <AlertTitle>System Status</AlertTitle>

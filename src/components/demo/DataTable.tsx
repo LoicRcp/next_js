@@ -42,12 +42,12 @@ const knowledgeData = [
 
 export function DataTable() {
   return (
-    <div className="w-full max-w-4xl">
+    <div className="h-full w-full">
       <Table>
         <TableCaption>Knowledge Base Entries</TableCaption>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-[100px]">ID</TableHead>
+            <TableHead className="w-[50px]">ID</TableHead>
             <TableHead>Concept</TableHead>
             <TableHead>Type</TableHead>
             <TableHead>Last Accessed</TableHead>

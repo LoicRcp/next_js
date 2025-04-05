@@ -1,10 +1,23 @@
 "use client"
 
 import { Progress } from "@/components/ui/progress"
+import { useEffect } from "react"
 
-export function ProgressDemo() {
+interface SizableProgressDemoProps {
+  onSizeChange?: (size: { width: number, height: number }) => void;
+}
+
+export function SizableProgressDemo({ onSizeChange }: SizableProgressDemoProps) {
+  // Au rendu, mesurer la taille et la communiquer au parent
+  useEffect(() => {
+    // Les dimensions dont ce composant a besoin pour s'afficher correctement
+    if (onSizeChange) {
+      onSizeChange({ width: 300, height: 180 });
+    }
+  }, [onSizeChange]);
+  
   return (
-    <div className="space-y-4 h-full">
+    <div className="space-y-4 h-full w-full">
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium">Graph Database</span>
