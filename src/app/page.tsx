@@ -1,5 +1,7 @@
 import { DashboardClient } from "./DashboardClient";
 import { SystemStatus } from "@/components/status/SystemStatus";
+import Link from 'next/link';
+import { MessageSquare } from 'lucide-react';
 
 export default function Home() {
   return (
@@ -12,6 +14,16 @@ export default function Home() {
         
         <div className="w-full max-w-3xl mb-4">
           <SystemStatus />
+        </div>
+        
+        <div className="flex justify-center mb-6">
+          <Link 
+            href="/chat" 
+            className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-md transition-colors"
+          >
+            <MessageSquare className="h-4 w-4" />
+            Ouvrir le chat IA
+          </Link>
         </div>
         
         <DashboardClient />

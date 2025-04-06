@@ -1,6 +1,8 @@
 # Intégration du Model Context Protocol dans le Client Next.js
 
-Ce document décrit l'implémentation du Model Context Protocol (MCP) dans notre application client Next.js pour le Hub de Connaissances Personnel IA.
+> **Note importante**: Ce document décrit l'approche traditionnelle d'implémentation du client MCP. À partir du Jalon 1.2, nous utilisons le Vercel AI SDK qui fournit une implémentation native du client MCP. Voir [VERCEL_AI_SDK_INTEGRATION.md](./VERCEL_AI_SDK_INTEGRATION.md) pour plus de détails sur la nouvelle approche.
+
+Ce document décrit l'implémentation originale du Model Context Protocol (MCP) dans notre application client Next.js pour le Hub de Connaissances Personnel IA.
 
 ## Table des matières
 
