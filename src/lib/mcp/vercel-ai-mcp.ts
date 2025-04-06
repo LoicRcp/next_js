@@ -1,4 +1,5 @@
 import { experimental_createMCPClient } from 'ai';
+import { MCPClientWrapper } from './mcp-client';
 
 /**
  * Utilitaires pour l'utilisation du Model Context Protocol (MCP) avec Vercel AI SDK
@@ -26,64 +27,23 @@ export async function createMCPClient() {
  * Effectue un healthcheck du serveur MCP et de Neo4j
  * @param includeDetails Si true, inclut des informations détaillées sur l'état du système
  * @returns Statut du serveur et de Neo4j
+ * 
+ * NOTE: Cette fonction utilise actuellement l'ancienne approche MCPClientWrapper
+ * car il y a des problèmes avec l'approche SSE du Vercel AI SDK pour cette opération.
  */
 export async function checkMCPStatus(includeDetails = false) {
-  console.log('Entering checkMCPStatus function');
-  const mcpClient = await createMCPClient();
+  console.log('Using legacy MCPClientWrapper for healthcheck');
   
   try {
-    console.log('Attempting to get tools from MCP client');
-    const mcpTools = await mcpClient.tools();
-    console.log('Successfully got tools:', Object.keys(mcpTools));
+    // Utilisation temporaire de l'ancien wrapper pour le healthcheck
+    const mcpClient = new MCPClientWrapper();
+    const result = await mcpClient.pingMCPServer(includeDetails);
     
-    // Vérifier si healthCheck existe
-    if (!mcpTools.healthCheck) {
-      console.log('No healthCheck tool found, returning fallback response');
-      return {
-        result: {
-          content: [
-            {
-              type: 'text',
-              text: 'Erreur: Outil healthCheck non disponible sur le serveur MCP.'
-            }
-          ],
-          status: {
-            mcp: {
-              status: 'ERROR',
-              timestamp: new Date().toISOString()
-            },
-            neo4j: {
-              connected: false,
-              error: 'Outil healthCheck non disponible'
-            }
-          },
-          isError: true
-        },
-        jsonrpc: "2.0",
-        id: Date.now()
-      };
-    }
-    
-    // @ts-ignore - Nous savons que l'outil healthCheck existe
-    console.log('Calling healthCheck tool with includeDetails:', includeDetails);
-    const result = await mcpTools.healthCheck({ includeDetails });
-    console.log('healthCheck result:', JSON.stringify(result, null, 2));
-    
-    // Formater la réponse pour qu'elle corresponde à l'ancienne structure pour compatibilité
-    const formattedResult = {
-      result: result,
-      jsonrpc: "2.0",
-      id: Date.now()
-    };
-    
-    return formattedResult;
+    console.log('healthCheck result received');
+    return result;
   } catch (error) {
     console.error('Error executing healthCheck:', error);
     throw error;
-  } finally {
-    // S'assurer que le client est toujours fermé
-    console.log('Closing MCP client');
-    await mcpClient.close();
   }
 }
 
@@ -136,24 +96,14 @@ export async function updateGraph(cypherQuery: string, params: Record<string, an
  * @returns Liste des outils disponibles
  */
 export async function listMCPTools() {
-  const mcpClient = await createMCPClient();
+  // Utilisation temporaire de l'ancien wrapper pour listTools
+  console.log('Using legacy MCPClientWrapper for listTools');
   
   try {
-    const mcpTools = await mcpClient.tools();
-    
-    // Transformer en format compatible avec l'ancienne API
-    const toolsList = Object.keys(mcpTools).map(toolName => {
-      return {
-        name: toolName,
-        // On pourrait éventuellement récupérer plus d'informations
-        // mais ce n'est pas directement exposé par le SDK
-      };
-    });
-    
-    return {
-      tools: toolsList
-    };
-  } finally {
-    await mcpClient.close();
+    const mcpClient = new MCPClientWrapper();
+    return await mcpClient.listTools();
+  } catch (error) {
+    console.error('Error listing MCP tools:', error);
+    throw error;
   }
 }
