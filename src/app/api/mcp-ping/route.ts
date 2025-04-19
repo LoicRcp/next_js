@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { checkMCPStatus } from '@/lib/mcp/vercel-ai-mcp';
+
 
 /**
  * API Route pour vérifier l'état du serveur MCP et sa connexion à Neo4j
@@ -16,7 +16,17 @@ export async function GET(request: NextRequest) {
     
     try {
       // Utiliser la fonction utilitaire pour vérifier le statut
-      const result = await checkMCPStatus(includeDetails);
+      //const result = await checkMCPStatus(includeDetails);
+      //TODO: Refaire la vérification du statut MCP pour utiliser les events SSE.
+      //placeholder
+      const result = {
+        status: 'OK',
+        details: includeDetails ? {
+          serverTime: new Date().toISOString(),
+          neo4jStatus: 'Connected (PLACEHOLDER)',
+          additionalInfo: 'All systems operational (PLACEHOLDER)'
+        } : null
+      };
       
       console.log('MCP status check result:', JSON.stringify(result, null, 2));
       
