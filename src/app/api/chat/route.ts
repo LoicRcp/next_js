@@ -14,14 +14,14 @@ import { getMcpClient } from '@/lib/mcp-client';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 
 // --- Constantes et Vérification initiale (inchangées) ---
-const GEMINI_MODEL_ID = process.env.GEMINI_MODEL_ID || 'gemini-1.5-flash';
-const SYSTEM_PROMPT = `
-You are the Knowledge Hub Orchestrator Agent. Your primary role is to interact conversationally with the user, understand their requests, plan necessary actions, and delegate the execution to specialized Agents via the provided tools. You synthesize results for the user. You MUST use the available tools to interact with the knowledge graph or external services. Do not attempt to access data directly. Be concise and helpful. Always check if information exists before attempting to create it using findNode. Prioritize updating existing information over creating duplicates.
-`; // Mise à jour mineure: find_nodes -> findNode
-const GOOGLE_API_KEY_ENV_VAR = 'GOOGLE_GENERATIVE_AI_API_KEY';
+const geminiModelId = process.env.GEMINI_MODEL_ID || 'gemini-1.5-flash';
+const systemPrompt = `
+You are the Knowledge Hub Orchestrator Agent. Your primary role is to interact conversationally with the user, understand their requests, plan necessary actions, and delegate the execution to specialized Agents via the provided tools. You synthesize results for the user. You MUST use the available tools to interact with the knowledge graph or external services. Do not attempt to access data directly. Be concise and helpful. Always check if information exists before attempting to create it using findNodes. Prioritize updating existing information over creating duplicates.
+`; 
+const googleApiKeyEnvVar = 'GOOGLE_GENERATIVE_AI_API_KEY';
 
-if (!process.env[GOOGLE_API_KEY_ENV_VAR]) {
-  console.warn(`\n[Startup Warning] Environment variable ${GOOGLE_API_KEY_ENV_VAR} is not set. Google AI calls might fail.`);
+if (!process.env[googleApiKeyEnvVar]) {
+  console.warn(`\n[Startup Warning] Environment variable ${googleApiKeyEnvVar} is not set. Google AI calls might fail.`);
 }
 
 // --- Définition Statique des Schémas Zod pour les Outils ---
@@ -31,65 +31,65 @@ if (!process.env[GOOGLE_API_KEY_ENV_VAR]) {
 // advanced-graph-tools.js utilise snake_case
 // schema-tools.js utilise snake_case
 
-// --- Outils de Advanced Graph Tools (snake_case params) ---
+// --- Outils de Advanced Graph Tools (Paramètres en camelCase) ---
 const getNeighborSummaryToolSchema = z.object({
-    nodeQuery: z.string() // Nom interne schema Zod renommé
+    nodeQuery: z.string()
       .describe("Critères pour identifier le nœud central (JSON string). Format : '{\"id\":\"uuid-123\"}' ou '{\"label\":\"Projet\", \"property\":\"name\", \"value\":\"Projet A\"}'"),
-    relationship_type: z.string().optional().default("")
+    relationshipType: z.string().optional().default("") // Modifié: relationship_type -> relationshipType
       .describe("Type de relation à suivre (optionnel, laisser vide pour toutes les relations)"),
     direction: z.enum(["OUTGOING", "INCOMING", "BOTH"]).optional().default("OUTGOING")
       .describe("Direction des relations (OUTGOING, INCOMING, BOTH)"),
-    neighbor_label: z.string().optional().default("")
+    neighborLabel: z.string().optional().default("") // Modifié: neighbor_label -> neighborLabel
       .describe("Label des nœuds voisins (optionnel, laisser vide pour tous les labels)"),
-    properties_to_return: z.string().optional().default("id,title")
+    propertiesToReturn: z.string().optional().default("id,title") // Modifié: properties_to_return -> propertiesToReturn
       .describe("Liste des propriétés à inclure dans le résumé, séparées par des virgules. Exemple: 'id,title,status'"),
     limit: z.number().int().optional().default(50)
       .describe("Nombre maximum de voisins à retourner")
-  });
+});
 
 const findPathsToolSchema = z.object({
-    startNodeQuery: z.string() // Nom interne schema Zod renommé
+    startNodeQuery: z.string()
       .describe("Critères pour identifier le nœud de départ (JSON string). Format : '{\"id\":\"uuid-123\"}' ou '{\"label\":\"Projet\", \"property\":\"name\", \"value\":\"Projet A\"}'"),
-    endNodeQuery: z.string() // Nom interne schema Zod renommé
+    endNodeQuery: z.string()
       .describe("Critères pour identifier le nœud d'arrivée (JSON string). Format : '{\"id\":\"uuid-456\"}' ou '{\"label\":\"Tâche\", \"property\":\"title\", \"value\":\"Implémenter API\"}'"),
-    relationship_types: z.string().optional().default("")
+    relationshipTypes: z.string().optional().default("") // Modifié: relationship_types -> relationshipTypes
       .describe("Types de relations à suivre, séparés par des virgules. Exemple: 'DEPENDS_ON,RELATED_TO'. Laisser vide pour tous les types."),
-    max_depth: z.number().int().min(1).max(5).optional().default(3)
+    maxDepth: z.number().int().min(1).max(5).optional().default(3) // Modifié: max_depth -> maxDepth
       .describe("Profondeur maximale de recherche"),
     limit: z.number().int().min(1).max(10).optional().default(3)
       .describe("Nombre maximum de chemins à retourner")
-  });
+});
 
 const aggregateNeighborPropertiesToolSchema = z.object({
-    nodeQuery: z.string() // Nom interne schema Zod renommé
+    nodeQuery: z.string()
       .describe("Critères pour identifier le nœud central (JSON string). Format : '{\"id\":\"uuid-123\"}' ou '{\"label\":\"Projet\", \"property\":\"name\", \"value\":\"Projet A\"}'"),
-    relationship_type: z.string().optional().default("")
+    relationshipType: z.string().optional().default("") // Modifié: relationship_type -> relationshipType
       .describe("Type de relation à suivre (optionnel, laisser vide pour toutes les relations)"),
     direction: z.enum(["OUTGOING", "INCOMING", "BOTH"]).optional().default("OUTGOING")
       .describe("Direction des relations (OUTGOING, INCOMING, BOTH)"),
-    neighbor_label: z.string().optional().default("")
+    neighborLabel: z.string().optional().default("") // Modifié: neighbor_label -> neighborLabel
       .describe("Label des nœuds voisins (optionnel, laisser vide pour tous les labels)"),
-    property_to_aggregate: z.string()
+    propertyToAggregate: z.string() // Modifié: property_to_aggregate -> propertyToAggregate
       .describe("Propriété sur laquelle calculer l'agrégat"),
     aggregation: z.enum(["COUNT", "SUM", "AVG", "MIN", "MAX", "COLLECT"]).optional().default("COUNT")
       .describe("Type d'agrégation à effectuer")
-  });
-
-const findNodesToolSchema = z.object({ // Version conservée depuis advanced-graph-tools
-    label: z.string().describe("Label du nœud à rechercher."), // Paramètre vient de advanced-graph-tools
-    properties: z.string().optional().default("{}").describe("Propriétés pour filtrer (JSON string). Recherche par 'id' (UUID) ou propriétés métier. Exemple: '{\"id\":\"uuid-123\"}' ou '{\"status\":\"En cours\"}'"), // Paramètre vient de advanced-graph-tools
-    limit: z.number().int().optional().default(10).describe("Nombre maximum de résultats.") // Paramètre vient de advanced-graph-tools
 });
 
-const getNodeDetailsToolSchema = z.object({ // Version conservée depuis advanced-graph-tools
-    nodeQuery: z.string() // Nom interne schema Zod renommé
+const findNodesToolSchema = z.object({
+    label: z.string().describe("Label du nœud à rechercher."),
+    properties: z.string().optional().default("{}").describe("Propriétés pour filtrer (JSON string). Recherche par 'id' (UUID) ou propriétés métier. Exemple: '{\"id\":\"uuid-123\"}' ou '{\"status\":\"En cours\"}'"),
+    limit: z.number().int().optional().default(10).describe("Nombre maximum de résultats.")
+});
+
+const getNodeDetailsToolSchema = z.object({
+    nodeQuery: z.string()
       .describe("Critères d'identification du nœud (JSON string). Format : '{\"id\":\"uuid-123\"}' ou '{\"label\":\"Projet\", \"property\":\"name\", \"value\":\"Projet A\"}'"),
-    detailLevel: z.enum(["core", "full_properties"]).optional().default("core") // detailLevel vient d'advanced-graph-tools
+    detailLevel: z.enum(["core", "full_properties"]).optional().default("core")
       .describe("Niveau de détail souhaité ('core' pour propriétés essentielles + résumé relations, 'full_properties' pour toutes les propriétés + résumé relations).")
 });
 
 
-// --- Outils de Graph Tools (camelCase params, sauf nouveaux) ---
+// --- Outils de Graph Tools (Paramètres déjà en camelCase ou simples) ---
 const queryGraphToolSchema = z.object({
     query: z.string()
       .describe("Requête Cypher à exécuter"),
@@ -108,7 +108,7 @@ const updateGraphToolSchema = z.object({
       .describe("Explication en langage naturel de ce que fait cette mise à jour (pour documentation)")
 });
 
-const getGraphSchemaToolSchema = z.object({ // Nom variable renommé
+const getGraphSchemaToolSchema = z.object({
     detailLevel: z.enum(["basic", "detailed"]).optional().default("basic")
       .describe("Niveau de détail (basic = labels et relations uniquement, detailed = avec propriétés)"),
     focusLabel: z.string().optional().default("")
@@ -132,9 +132,9 @@ const updateNodePropertiesToolSchema = z.object({
     nodeQuery: z.string()
       .describe("Critères pour identifier le nœud (JSON string). Format : '{\"id\":\"uuid-123\"}' ou '{\"label\":\"Projet\", \"property\":\"name\", \"value\":\"Projet A\"}'"),
     properties: z.string()
-      .describe("Propriétés à mettre à jour (JSON string). **Important** : La propriété 'id' ne peut pas être modifiée. La propriété 'sourceType' ne peut pas être modifiée via l'opération 'set'. La propriété 'updatedAt' est automatiquement mise à jour. Exemple: '{\"status\":\"Terminé\", \"updatedBy\":\"Alice\"}'"), // Description mise à jour
+      .describe("Propriétés à mettre à jour (JSON string). **Important** : La propriété 'id' ne peut pas être modifiée. La propriété 'sourceType' ne peut pas être modifiée via l'opération 'set'. La propriété 'updatedAt' est automatiquement mise à jour. Exemple: '{\"status\":\"Terminé\", \"updatedBy\":\"Alice\"}'"),
     operation: z.enum(["set", "replace", "remove"]).optional().default("set")
-      .describe("Type d'opération. 'set' (défaut, mise à jour), 'replace' remplace toutes les propriétés *sauf* 'id' et 'sourceType', 'remove' (supprime les propriétés spécifiées)") // Description mise à jour
+      .describe("Type d'opération. 'set' (défaut, mise à jour), 'replace' remplace toutes les propriétés *sauf* 'id' et 'sourceType', 'remove' (supprime les propriétés spécifiées)")
 });
 
 const addNodeLabelToolSchema = z.object({
@@ -156,9 +156,8 @@ const deleteRelationshipToolSchema = z.object({
 const deleteNodeToolSchema = z.object({
     nodeQuery: z.string()
       .describe("Critères pour identifier le nœud (JSON string). Format : '{\"id\":\"uuid-123\"}' ou '{\"label\":\"Projet\", \"property\":\"name\", \"value\":\"Projet A\"}'"),
-    detach: z.boolean().optional().default(false) // Default était true, corrigé à false si besoin
+    detach: z.boolean().optional().default(false)
       .describe("Si true, supprime également toutes les relations du nœud (DETACH DELETE)")
-    // confirmation: retiré
 });
 
 const checkRelationshipExistsToolSchema = z.object({
@@ -172,16 +171,6 @@ const checkRelationshipExistsToolSchema = z.object({
       .describe("Si true, vérifie également les relations dans la direction opposée")
 });
 
-// --- Nouveaux Outils de Graph Tools ---
-const findNodeToolSchema = z.object({
-    label: z.string()
-      .describe("Label du nœud à rechercher"),
-    properties: z.string().optional().default("{}")
-      .describe("Propriétés pour filtrer (JSON string). Recherche par 'id' (UUID) ou propriétés métier. Exemple: '{\"id\":\"uuid-123\"}' ou '{\"status\":\"En cours\"}'"),
-    limit: z.number().int().optional().default(10)
-      .describe("Nombre maximum de résultats")
-});
-
 const createNodeToolSchema = z.object({
     label: z.string()
       .describe("Label du nœud à créer"),
@@ -192,18 +181,18 @@ const createNodeToolSchema = z.object({
 });
 
 
-// --- Outils de Schema Tools (snake_case params) ---
+// --- Outils de Schema Tools (Paramètres en camelCase) ---
 const getSchemaCatalogueToolSchema = z.object({
-    element_type: z.enum(["tag", "relationship_type"]) // Param snake_case
+    elementType: z.enum(["tag", "relationship_type"]) // Modifié: element_type -> elementType
       .describe("Le type d'élément de schéma à lister ('tag' ou 'relationship_type').")
 });
 
 const addSchemaElementToolSchema = z.object({
-    element_type: z.enum(["tag", "relationship_type"]) // Param snake_case
+    elementType: z.enum(["tag", "relationship_type"]) // Modifié: element_type -> elementType
       .describe("Le type d'élément de schéma à ajouter ('tag' ou 'relationship_type')."),
-    name: z.string() // Param snake_case (ici name est simple)
+    name: z.string()
       .describe("Le nom du nouvel élément (ex: 'concept_clé', 'depends_on')."),
-    description: z.string() // Param snake_case (ici description est simple)
+    description: z.string()
       .describe("Une description expliquant la signification de ce nouvel élément.")
 });
 
@@ -299,12 +288,11 @@ const availableTools: Record<string, Tool<any, any>> = {
       parameters: checkRelationshipExistsToolSchema, // Updated schema
       execute: createMcpExecutor('checkRelationshipExists'), // CamelCase name
   }),
-  // --- Nouveaux Outils ---
-  findNode: tool({
-      description: "Recherche des nœuds par label et/ou propriétés.",
-      parameters: findNodeToolSchema, // Nouveau schema
-      execute: createMcpExecutor('findNode'), // CamelCase name
-  }),
+  findNodes: tool({ // Version conservée depuis advanced-graph-tools
+    description: "Recherche des nœuds par label et/ou propriétés.",
+    parameters: findNodesToolSchema, // Schema correspondant
+    execute: createMcpExecutor('findNodes'), // CamelCase name
+}),
   createNode: tool({
       description: "Crée un nouveau nœud après avoir vérifié qu'un nœud similaire n'existe pas déjà.",
       parameters: createNodeToolSchema, // Nouveau schema
@@ -328,11 +316,7 @@ const availableTools: Record<string, Tool<any, any>> = {
       parameters: aggregateNeighborPropertiesToolSchema, // Updated schema (params renamed inside)
       execute: createMcpExecutor('aggregateNeighborProperties'), // CamelCase name
   }),
-   findNodes: tool({ // Version conservée depuis advanced-graph-tools
-       description: "Recherche des nœuds par label et/ou propriétés.",
-       parameters: findNodesToolSchema, // Schema correspondant
-       execute: createMcpExecutor('findNodes'), // CamelCase name
-   }),
+
    getNodeDetails: tool({ // Version conservée depuis advanced-graph-tools
        description: "Récupère toutes les informations d'un nœud spécifique.",
        parameters: getNodeDetailsToolSchema, // Schema correspondant
@@ -371,12 +355,12 @@ export async function POST(req: Request) {
       console.log("[API Route] MCP client checked.");
     }
 
-    console.log(`[API Route] Calling Google AI model '${GEMINI_MODEL_ID}'...`);
+    console.log(`[API Route] Calling Google AI model '${geminiModelId}'...`);
     const result = await streamText({
-      model: google(GEMINI_MODEL_ID),
-      system: SYSTEM_PROMPT,
+      model: google(geminiModelId),
+      system: systemPrompt,
       messages,
-      tools: availableTools, // Utilise l'objet mis à jour
+      tools: availableTools,
 
       onFinish: ({ finishReason, usage }) => {
           console.log(`[API Route] Stream finished. Reason: ${finishReason}`);
