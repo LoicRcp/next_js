@@ -135,6 +135,17 @@ const getNodeDetailsToolSchema = z.object({
       .describe("Niveau de détail souhaité ('core' ou 'fullProperties').")
 });
 
+const searchNodesByTextToolSchema = z.object({
+    indexName: z.string().default("nodeContentIndex")
+      .describe("Nom de l'index Full-Text à utiliser (ex: 'nodeContentIndex')."),
+    queryText: z.string()
+      .describe("Texte ou requête de recherche."),
+    limit: z.number().int().optional().default(10)
+      .describe("Nombre maximum de résultats."),
+    minScore: z.number().optional().default(0.0)
+      .describe("Score de pertinence minimum.")
+});
+
 // --- Outils de Graph Tools ---
 const queryGraphToolSchema = z.object({
     query: z.string().describe("Requête Cypher à exécuter"),
@@ -219,6 +230,11 @@ const readerTools: Record<string, Tool<any, any>> = {
     getGraphSchema: tool({ description: "Liste les labels, types de relations et propriétés du graphe.", parameters: getGraphSchemaToolSchema, execute: async (args) => executeMcpToolForAgent('getGraphSchema', args) }),
     getSchemaCatalogue: tool({ description: "Liste les éléments de schéma existants (tags, types de relation RELATED_TO).", parameters: getSchemaCatalogueToolSchema, execute: async (args) => executeMcpToolForAgent('getSchemaCatalogue', args) }),
     queryGraph: tool({ description: "Exécute une requête Cypher personnalisée en lecture seule.", parameters: queryGraphToolSchema, execute: async (args) => executeMcpToolForAgent('queryGraph', args) }),
+    searchNodesByText: tool({
+        description: "Recherche des nœuds contenant un texte spécifique via l'index Full-Text Search. À utiliser pour les recherches textuelles ouvertes.",
+        parameters: searchNodesByTextToolSchema,
+        execute: async (args) => executeMcpToolForAgent('searchNodesByText', args)
+    }),
 };
 
 const integratorTools: Record<string, Tool<any, any>> = {
@@ -227,6 +243,17 @@ const integratorTools: Record<string, Tool<any, any>> = {
     getNodeDetails: tool({ description: "Récupère toutes les informations d'un nœud spécifique.", parameters: getNodeDetailsToolSchema, execute: async (args) => executeMcpToolForAgent('getNodeDetails', args) }),
     checkRelationshipExists: tool({ description: "Vérifie si une relation spécifique existe entre deux nœuds.", parameters: checkRelationshipExistsToolSchema, execute: async (args) => executeMcpToolForAgent('checkRelationshipExists', args) }),
     getSchemaCatalogue: tool({ description: "Liste les éléments de schéma existants (tags, types de relation RELATED_TO).", parameters: getSchemaCatalogueToolSchema, execute: async (args) => executeMcpToolForAgent('getSchemaCatalogue', args) }),
+    searchNodesByText: tool({ description: "Recherche des nœuds contenant un texte spécifique via l'index Full-Text Search. À utiliser pour vérifier l'existence de contenu similaire.", parameters: searchNodesByTextToolSchema, execute: async (args) => executeMcpToolForAgent('searchNodesByText', args) }),
+    // Écriture
+    createNode: tool({ description: "Crée un nouveau nœud après vérification d'existence.", parameters: createNodeToolSchema, execute: async (args) => executeMcpToolForAgent('createNode', args) }),
+    createRelationship: tool({ description: "Crée une relation entre deux nœuds existants.", parameters: createRelationshipToolSchema, execute: async (args) => executeMcpToolForAgent('createRelationship', args) }),
+    updateNodeProperties: tool({ description: "Met à jour les propriétés d'un nœud existant.", parameters: updateNodePropertiesToolSchema, execute: async (args) => executeMcpToolForAgent('updateNodeProperties', args) }),
+    addNodeLabel: tool({ description: "Ajoute un label supplémentaire à un nœud existant.", parameters: addNodeLabelToolSchema, execute: async (args) => executeMcpToolForAgent('addNodeLabel', args) }),
+    deleteRelationship: tool({ description: "Supprime une relation spécifique entre deux nœuds.", parameters: deleteRelationshipToolSchema, execute: async (args) => executeMcpToolForAgent('deleteRelationship', args) }),
+    deleteNode: tool({ description: "Supprime un nœud du graphe.", parameters: deleteNodeToolSchema, execute: async (args) => executeMcpToolForAgent('deleteNode', args) }),
+    addSchemaElement: tool({ description: "Ajoute un nouvel élément (tag ou type de relation) au catalogue externe.", parameters: addSchemaElementToolSchema, execute: async (args) => executeMcpToolForAgent('addSchemaElement', args) }),
+    updateGraph: tool({ description: "Exécute une requête Cypher de modification complexe.", parameters: updateGraphToolSchema, execute: async (args) => executeMcpToolForAgent('updateGraph', args) }),
+};
     // Écriture
     createNode: tool({ description: "Crée un nouveau nœud après vérification d'existence.", parameters: createNodeToolSchema, execute: async (args) => executeMcpToolForAgent('createNode', args) }),
     createRelationship: tool({ description: "Crée une relation entre deux nœuds existants.", parameters: createRelationshipToolSchema, execute: async (args) => executeMcpToolForAgent('createRelationship', args) }),
