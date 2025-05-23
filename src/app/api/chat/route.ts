@@ -57,52 +57,52 @@ const callIntegratorAgentSchema = z.object({
 // TODO: Ajouter les schémas pour callRestructuratorAgent et callExternalAgent si nécessaire
 
 
-// --- Création de l'objet 'availableTools' pour l'ORCHESTRATEUR ---
-// Ne contient QUE les outils de délégation !
-const availableTools: Record<string, Tool<any, any>> = {
-  callReaderAgent: tool({
-    description: "Délègue une tâche de lecture ou de recherche d'informations dans le graphe de connaissances à l'Agent Lecteur spécialisé.",
-    parameters: callReaderAgentSchema,
-    execute: async (args) => {
-      console.log(`[Orchestrator Tool] Calling executeReaderAgentCall with:`, args);
-      // Appelle la fonction importée depuis agent-caller.ts
-      const result = await executeReaderAgentCall(args);
-      console.log(`[Orchestrator Tool] Result from executeReaderAgentCall:`, result);
-       // Retourner le résultat brut pour que le LLM Orchestrateur puisse le traiter
-       // Le SDK s'attend à ce que le résultat soit sérialisable en JSON.
-       // Si result.data est complexe, assure-toi qu'il est sérialisable.
-       // On pourrait juste retourner result.summary_text ou un objet simplifié.
-       // Retournons l'objet complet pour l'instant.
-      return result;
-    }
-  }),
-  callIntegratorAgent: tool({
-    description: "Délègue une tâche de création ou de modification d'informations (préparation pour intégration) dans le graphe de connaissances à l'Agent Intégrateur spécialisé.",
-    parameters: callIntegratorAgentSchema,
-    execute: async (args) => {
-      console.log(`[Orchestrator Tool] Calling executeIntegratorAgentCall with:`, args);
-      // Appelle la fonction importée depuis agent-caller.ts
-      const result = await executeIntegratorAgentCall(args);
-      console.log(`[Orchestrator Tool] Result from executeIntegratorAgentCall:`, result);
-       // Retourner le résultat brut pour que le LLM Orchestrateur puisse le traiter
-      return result;
-    }
-  }),
-  // TODO: Ajouter les outils callRestructuratorAgent et callExternalAgent ici
-};
-
-// --- Suppression de la fonction createMcpExecutor ---
-// Elle n'est plus nécessaire ici car l'Orchestrateur n'appelle plus les outils MCP directement.
-
 // --- Route Handler POST (Logique principale) ---
 export async function POST(req: Request) {
   try {
     console.log("\n--- [API Route] Received POST request ---");
 
-    const { messages }: { messages: CoreMessage[] } = await req.json();
+    const { messages, chatId }: { messages: CoreMessage[], chatId?: string } = await req.json();
     if (!messages || messages.length === 0) {
       return NextResponse.json({ error: "No messages provided" }, { status: 400 });
     }
+    const integrationBatchId = chatId ? `batch_${chatId}_${Date.now()}` : undefined;
+
+    // --- Création de l'objet 'availableTools' pour l'ORCHESTRATEUR ---
+    // Déplacé ici pour avoir accès à integrationBatchId et chatId
+    const availableTools: Record<string, Tool<any, any>> = {
+      callReaderAgent: tool({
+        description: "Délègue une tâche de lecture ou de recherche d'informations dans le graphe de connaissances à l'Agent Lecteur spécialisé.",
+        parameters: callReaderAgentSchema,
+        execute: async (args) => {
+          console.log(`[Orchestrator Tool] Calling executeReaderAgentCall with:`, args);
+          // Appelle la fonction importée depuis agent-caller.ts
+          const result = await executeReaderAgentCall({
+            ...args,
+            integrationBatchId: integrationBatchId,
+            chatId: chatId
+          });
+          console.log(`[Orchestrator Tool] Result from executeReaderAgentCall:`, result);
+          return result;
+        }
+      }),
+      callIntegratorAgent: tool({
+        description: "Délègue une tâche de création ou de modification d'informations (préparation pour intégration) dans le graphe de connaissances à l'Agent Intégrateur spécialisé.",
+        parameters: callIntegratorAgentSchema,
+        execute: async (args) => {
+          console.log(`[Orchestrator Tool] Calling executeIntegratorAgentCall with:`, args);
+          const result = await executeIntegratorAgentCall({
+            ...args,
+            integrationBatchId: integrationBatchId,
+            chatId: chatId
+          });
+          console.log(`[Orchestrator Tool] Result from executeIntegratorAgentCall:`, result);
+          return result;
+        }
+      }),
+      // TODO: Ajouter les outils callRestructuratorAgent et callExternalAgent ici
+    };
+
     console.log(`[API Route] Processing ${messages.length} messages for Orchestrator.`);
 
     // Pas besoin de vérifier le client MCP ici directement

@@ -11,6 +11,7 @@ interface AgentCallArgs {
   integrationBatchId?: string;
   hasExistingPendingData?: boolean;
   lastSummary?: string;
+  chatId?: string;
 }
 
 interface AgentCallResult {
@@ -48,6 +49,132 @@ const READER_SYSTEM_PROMPT = loadPrompt('Agent Lecteur.md');
 const INTEGRATOR_SYSTEM_PROMPT_A = loadPrompt('Agent Integrateur.md');
 const INTEGRATOR_SYSTEM_PROMPT_B = loadPrompt('Agent Integrateur.md');
 // --------------------------------------------------------------------
+
+
+
+
+
+
+
+async function checkExistingPendingData(integrationBatchId: string): Promise<{
+  hasData: boolean;
+  nodeCount: number;
+}> {
+  try {
+    const result = await executeMcpToolForAgent('findNodes', {
+      label: 'InformationFragment',
+      properties: JSON.stringify({
+        integrationBatchId: integrationBatchId,
+        integrationStatus: 'pending'
+      }),
+      limit: 1
+    });
+    
+    const nodeCount = result?.data?.count || 0;
+    return {
+      hasData: nodeCount > 0,
+      nodeCount: nodeCount
+    };
+  } catch (error) {
+    console.error(`[Batch Check] Error checking pending data:`, error);
+    return { hasData: false, nodeCount: 0 };
+  }
+}
+
+// Helper pour récupérer le lastSummary d'un batch
+async function getBatchSummary(integrationBatchId: string): Promise<string> {
+  try {
+    const result = await executeMcpToolForAgent('findNodes', {
+      label: 'IntegrationBatch',
+      properties: JSON.stringify({
+        batchId: integrationBatchId
+      }),
+      limit: 1
+    });
+    
+    if (result?.data?.nodes && result.data.nodes.length > 0) {
+      return result.data.nodes[0].lastSummary || '';
+    }
+    return '';
+  } catch (error) {
+    console.error(`[Batch Summary] Error retrieving batch summary:`, error);
+    return '';
+  }
+}
+
+// Helper pour marquer les nœuds comme pending
+async function markNodesAsPending(nodeIds: string[], integrationBatchId: string): Promise<void> {
+  for (const nodeId of nodeIds) {
+    try {
+      await executeMcpToolForAgent('updateNodeProperties', {
+        nodeQuery: JSON.stringify({ id: nodeId }),
+        properties: JSON.stringify({
+          integrationBatchId: integrationBatchId,
+          integrationStatus: 'pending'
+        }),
+        operation: 'set'
+      });
+      console.log(`[Batch Marking] Node ${nodeId} marked as pending for batch ${integrationBatchId}`);
+    } catch (error) {
+      console.error(`[Batch Marking] Failed to mark node ${nodeId}:`, error);
+    }
+  }
+}
+
+// Helper pour créer ou mettre à jour le nœud IntegrationBatch
+async function manageBatchNode(
+  integrationBatchId: string, 
+  newSummary: string,
+  isNewBatch: boolean,
+  chatId?: string
+): Promise<void> {
+  const now = new Date().toISOString();
+  
+  if (isNewBatch) {
+    // Créer un nouveau nœud IntegrationBatch
+    try {
+      await executeMcpToolForAgent('createNode', {
+        label: 'IntegrationBatch',
+        properties: JSON.stringify({
+          batchId: integrationBatchId,
+          status: 'pending',
+          lastSummary: newSummary,
+          conversationId: chatId,
+          sourceType: 'batch_manager'
+        }),
+        identifyingProperties: JSON.stringify(['batchId'])
+      });
+      console.log(`[Batch Node] Created new IntegrationBatch: ${integrationBatchId}`);
+    } catch (error) {
+      console.error(`[Batch Node] Failed to create batch node:`, error);
+    }
+  } else {
+    // Mettre à jour le nœud existant
+    try {
+      await executeMcpToolForAgent('updateNodeProperties', {
+        nodeQuery: JSON.stringify({ 
+          label: 'IntegrationBatch',
+          property: 'batchId',
+          value: integrationBatchId 
+        }),
+        properties: JSON.stringify({
+          lastSummary: newSummary,
+          lastUpdatedAt: now
+        }),
+        operation: 'set'
+      });
+      console.log(`[Batch Node] Updated IntegrationBatch: ${integrationBatchId}`);
+    } catch (error) {
+      console.error(`[Batch Node] Failed to update batch node:`, error);
+    }
+  }
+}
+
+
+
+
+
+
 
 // --- Fonction d'exécution MCP (inchangée) ---
 async function executeMcpToolForAgent(toolName: string, args: any): Promise<any> {
@@ -254,16 +381,6 @@ const integratorTools: Record<string, Tool<any, any>> = {
     addSchemaElement: tool({ description: "Ajoute un nouvel élément (tag ou type de relation) au catalogue externe.", parameters: addSchemaElementToolSchema, execute: async (args) => executeMcpToolForAgent('addSchemaElement', args) }),
     updateGraph: tool({ description: "Exécute une requête Cypher de modification complexe.", parameters: updateGraphToolSchema, execute: async (args) => executeMcpToolForAgent('updateGraph', args) }),
 };
-    // Écriture
-    createNode: tool({ description: "Crée un nouveau nœud après vérification d'existence.", parameters: createNodeToolSchema, execute: async (args) => executeMcpToolForAgent('createNode', args) }),
-    createRelationship: tool({ description: "Crée une relation entre deux nœuds existants.", parameters: createRelationshipToolSchema, execute: async (args) => executeMcpToolForAgent('createRelationship', args) }),
-    updateNodeProperties: tool({ description: "Met à jour les propriétés d'un nœud existant.", parameters: updateNodePropertiesToolSchema, execute: async (args) => executeMcpToolForAgent('updateNodeProperties', args) }),
-    addNodeLabel: tool({ description: "Ajoute un label supplémentaire à un nœud existant.", parameters: addNodeLabelToolSchema, execute: async (args) => executeMcpToolForAgent('addNodeLabel', args) }),
-    deleteRelationship: tool({ description: "Supprime une relation spécifique entre deux nœuds.", parameters: deleteRelationshipToolSchema, execute: async (args) => executeMcpToolForAgent('deleteRelationship', args) }),
-    deleteNode: tool({ description: "Supprime un nœud du graphe.", parameters: deleteNodeToolSchema, execute: async (args) => executeMcpToolForAgent('deleteNode', args) }),
-    addSchemaElement: tool({ description: "Ajoute un nouvel élément (tag ou type de relation) au catalogue externe.", parameters: addSchemaElementToolSchema, execute: async (args) => executeMcpToolForAgent('addSchemaElement', args) }),
-    updateGraph: tool({ description: "Exécute une requête Cypher de modification complexe.", parameters: updateGraphToolSchema, execute: async (args) => executeMcpToolForAgent('updateGraph', args) }),
-};
 
 
 // --- Fonctions d'Exécution des Agents Spécialisés (Logique LLM inchangée) ---
@@ -277,8 +394,21 @@ export async function executeReaderAgentCall(args: AgentCallArgs): Promise<Agent
     const messages: CoreMessage[] = [{ role: 'user', content: args.taskDescription }];
     console.log("[Agent Caller] Calling Reader LLM...");
     const { text, toolResults, finishReason, usage } = await generateText({
-      model: google(geminiModelId), system: READER_SYSTEM_PROMPT, messages: messages, tools: readerTools, maxSteps: 5,
-      responseFormat: { type: 'json_object' },
+      model: google(geminiModelId),
+      system: READER_SYSTEM_PROMPT,
+      messages: messages,
+      tools: readerTools,
+      maxSteps: 100,
+      onStepFinish: async (stepResult) => {
+        const toolResults = stepResult.toolResults as Array<{ toolName: string; args: any; result: any }> | undefined;
+        if (toolResults && toolResults.length > 0) {
+          for (const toolResult of toolResults) {
+            console.log(`[Reader Agent][Step] Tool used: ${toolResult.toolName}, Args:`, toolResult.args, 'Result:', toolResult.result, "reason:", stepResult.reasoning), "text:", stepResult.text;
+          }
+        } else {
+          console.log(`[Reader Agent][Step] No tool used in this step.`);
+        }
+      },
     });
     
     // --- AJOUT LOG LECTEUR ---
@@ -323,56 +453,162 @@ export async function executeReaderAgentCall(args: AgentCallArgs): Promise<Agent
  */
 export async function executeIntegratorAgentCall(args: AgentCallArgs): Promise<AgentCallResult> {
   console.log("[Agent Caller] Executing Integrator Agent Call with task:", args.taskDescription);
-  const integrationBatchId = args.integrationBatchId || `batch_${Date.now()}`;
-  const hasExistingPendingData = args.hasExistingPendingData || false;
-  const lastSummary = args.lastSummary || "";
-  try {
-     const systemPrompt = hasExistingPendingData ? INTEGRATOR_SYSTEM_PROMPT_B.replace('{lastSummary}', lastSummary) : INTEGRATOR_SYSTEM_PROMPT_A;
-     const messages: CoreMessage[] = [{ role: 'user', content: `integrationBatchId: ${integrationBatchId}\n\nTâche: ${args.taskDescription}` }];
-     console.log(`[Agent Caller] Calling Integrator LLM (Mode: ${hasExistingPendingData ? 'Modification/Ajout' : 'Création Initiale'})...`);
-     const { text, toolResults, finishReason, usage } = await generateText({
-       model: google(geminiModelId), system: systemPrompt, messages: messages, tools: integratorTools, maxSteps: 5,
-       responseFormat: { type: 'json_object' },
-     });
-     
-     // --- AJOUT LOG INTEGRATEUR ---
-     console.log("-------------------------------------------");
-     console.log("[Integrator Agent] RAW RESPONSE TEXT:");
-     console.log(text);
-     console.log("-------------------------------------------");
-     // --- FIN AJOUT LOG INTEGRATEUR ---
-     
-     console.log(`[Integrator Agent] Finish Reason: ${finishReason}, Usage: I=${usage.promptTokens}, O=${usage.completionTokens}`);
-     console.log(`[Integrator Agent] Raw Response Text:`, text);
-     // --- Logique Post-LLM (Placeholder) ---
-     console.log("[Agent Caller] Placeholder: Logique Post-LLM (marquage pending, etc.) à implémenter.");
-     // ---------------------------------------
-     try {
-        let toExtract = text;
-        if (text.includes("```json") || text.includes("```")) {
-            const startIndex = text.indexOf("```json") + 7;
-            const endIndex = text.indexOf("```", startIndex);
-            const jsonString = text.substring(startIndex, endIndex).trim();
-            console.log("[Integrator Agent] Extracted JSON string:", jsonString);
-            toExtract = jsonString;
-        }
+  console.log("[Agent Caller] Integration context:", { 
+    integrationBatchId: args.integrationBatchId, 
+    chatId: args.chatId 
+  });
 
-        const parsedResult = JSON.parse(toExtract);
-        if (parsedResult.success) {
-            console.log("[Integrator Agent] Parsed result:", parsedResult);
-            return { success: true, summary_text: parsedResult.newSummary || "Résumé non fourni.", data: { operation_type: parsedResult.operation_type, affectedNodeIds: parsedResult.affectedNodeIds || [], integrationBatchId: integrationBatchId } };
+  // Génération ou récupération de l'integrationBatchId
+  const integrationBatchId = args.integrationBatchId || `batch_${args.chatId || 'default'}_${Date.now()}`;
+  
+  let hasExistingPendingData = false;
+  let lastSummary = "";
+  let isNewBatch = true;
+
+  try {
+    // Étape 1: Vérifier s'il existe des données pending pour ce batch
+    console.log(`[Agent Caller] Checking for existing pending data in batch: ${integrationBatchId}`);
+    const pendingCheck = await checkExistingPendingData(integrationBatchId);
+    hasExistingPendingData = pendingCheck.hasData;
+    console.log(`[Agent Caller] Existing pending data found: ${hasExistingPendingData} (${pendingCheck.nodeCount} nodes)`);
+
+    // Étape 2: Si des données existent, récupérer le lastSummary
+    if (hasExistingPendingData) {
+      isNewBatch = false;
+      lastSummary = await getBatchSummary(integrationBatchId);
+      if (typeof lastSummary === 'string' && lastSummary.length > 0) {
+        console.log(`[Agent Caller] Retrieved last summary: ${lastSummary.substring(0, 100)}...`);
+      } else {
+        lastSummary = '';
+        console.log(`[Agent Caller] No last summary found.`);
+      }
+    }
+
+    // Étape 3: Sélectionner le prompt approprié
+    const systemPrompt = hasExistingPendingData 
+      ? (INTEGRATOR_SYSTEM_PROMPT_B ? INTEGRATOR_SYSTEM_PROMPT_B.replace('{lastSummary}', lastSummary || '') : '')
+      : (INTEGRATOR_SYSTEM_PROMPT_A || '');
+
+    // Étape 4: Préparer le message pour l'Agent Intégrateur
+    const contextMessage = [
+      `integrationBatchId: ${integrationBatchId}`,
+      hasExistingPendingData ? `hasExistingPendingData: true` : `hasExistingPendingData: false`,
+      hasExistingPendingData && lastSummary ? `lastSummary: ${lastSummary}` : '',
+      `Tâche: ${args.taskDescription}`
+    ].filter(Boolean).join('\n\n');
+
+    const messages: CoreMessage[] = [{ 
+      role: 'user', 
+      content: contextMessage 
+    }];
+
+    console.log(`[Agent Caller] Calling Integrator LLM (Mode: ${hasExistingPendingData ? 'Modification/Extension' : 'Création Initiale'})...`);
+
+    // Étape 5: Appel au LLM
+    const { text, toolResults, finishReason, usage } = await generateText({
+      model: google(geminiModelId),
+      system: systemPrompt,
+      messages: messages,
+      tools: integratorTools,
+      maxSteps: 100,
+      onStepFinish: async (stepResult) => {
+        const toolResults = stepResult.toolResults as Array<{ toolName: string; args: any; result: any }> | undefined;
+
+        if (toolResults && toolResults.length > 0) {
+          for (const toolResult of toolResults) {
+            console.log(`[Reader Agent][Step] Tool used: ${toolResult.toolName}, Args:`, toolResult.args, 'Result:', toolResult.result, "reason:", stepResult.reasoning), "text:", stepResult.text;
+          }
         } else {
-             console.warn("[Integrator Agent] Response format incorrect:", parsedResult);
-             return { success: false, error: "L'Agent Intégrateur a retourné une réponse dans un format inattendu.", summary_text: text };
+          console.log(`[Integrator Agent][Step] No tool used in this step.`);
         }
-     } catch (parseError: any) {
-        console.error("[Integrator Agent] Failed to parse JSON response:", parseError);
-        return { success: false, error: `Erreur de parsing de la réponse de l'Intégrateur: ${parseError.message}`, summary_text: text || "Réponse vide ou invalide de l'Agent Intégrateur." };
-     }
-   } catch (error: any) {
-     console.error("[Agent Caller] Error executing Integrator Agent call:", error);
-     return { success: false, error: `Erreur lors de l'appel à l'Agent Intégrateur: ${error.message}` };
-   }
+      },
+    });
+
+    console.log("-------------------------------------------");
+    console.log("[Integrator Agent] RAW RESPONSE TEXT:");
+    console.log(text);
+    console.log("-------------------------------------------");
+    console.log(`[Integrator Agent] Finish Reason: ${finishReason}, Usage: I=${usage?.promptTokens}, O=${usage?.completionTokens}`);
+
+    // Étape 6: Parser la réponse
+    try {
+      let toExtract = text;
+      if (text.includes("```json")) {
+        const startIndex = text.indexOf("```json") + 7;
+        const endIndex = text.indexOf("```", startIndex);
+        toExtract = text.substring(startIndex, endIndex).trim();
+      }
+
+      const parsedResult = JSON.parse(toExtract);
+      
+      if (!parsedResult.success) {
+        throw new Error(parsedResult.error || "L'Agent Intégrateur a signalé un échec");
+      }
+
+      // Étape 7: Post-traitement - Marquer les nœuds affectés
+      const affectedNodeIds = parsedResult.affectedNodeIds || [];
+      const newSummary = parsedResult.newSummary || "Aucun résumé fourni";
+
+      if (affectedNodeIds.length > 0) {
+        console.log(`[Agent Caller] Marking ${affectedNodeIds.length} nodes as pending...`);
+        await markNodesAsPending(affectedNodeIds, integrationBatchId);
+      }
+
+      // Étape 8: Créer ou mettre à jour le nœud IntegrationBatch
+      console.log(`[Agent Caller] Managing IntegrationBatch node...`);
+      await manageBatchNode(integrationBatchId, newSummary, isNewBatch, args.chatId);
+
+      // Étape 9: Retourner le résultat enrichi
+      return {
+        success: true,
+        summary_text: newSummary,
+        data: {
+          operation_type: parsedResult.operation_type,
+          affectedNodeIds: affectedNodeIds,
+          integrationBatchId: integrationBatchId,
+          batchStatus: isNewBatch ? 'created' : 'updated',
+          hasExistingPendingData: hasExistingPendingData
+        }
+      };
+
+    } catch (parseError: any) {
+      console.error("[Integrator Agent] Failed to parse or process response:", parseError);
+      
+      // En cas d'erreur, essayer de marquer le batch comme failed
+      if (integrationBatchId && !isNewBatch) {
+        try {
+          await executeMcpToolForAgent('updateNodeProperties', {
+            nodeQuery: JSON.stringify({ 
+              label: 'IntegrationBatch',
+              property: 'batchId',
+              value: integrationBatchId 
+            }),
+            properties: JSON.stringify({
+              status: 'failed',
+              errorMessage: parseError.message,
+              lastUpdatedAt: new Date().toISOString()
+            }),
+            operation: 'set'
+          });
+        } catch (updateError) {
+          console.error("[Batch Error] Failed to mark batch as failed:", updateError);
+        }
+      }
+
+      return {
+        success: false,
+        error: `Erreur de traitement: ${parseError.message}`,
+        summary_text: text || "Réponse invalide de l'Agent Intégrateur"
+      };
+    }
+
+  } catch (error: any) {
+    console.error("[Agent Caller] Error executing Integrator Agent call:", error);
+    return {
+      success: false,
+      error: `Erreur lors de l'appel à l'Agent Intégrateur: ${error.message}`
+    };
+  }
 }
 
 // TODO: Ajouter la fonction pour l'Agent Restructurateur (asynchrone)
