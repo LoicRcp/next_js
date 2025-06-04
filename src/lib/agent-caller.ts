@@ -273,6 +273,25 @@ const searchNodesByTextToolSchema = z.object({
       .describe("Score de pertinence minimum.")
 });
 
+const searchWithContextToolSchema = z.object({
+    query: z.string()
+      .describe("Requête textuelle pour la recherche"),
+    contextNodeIds: z.array(z.string()).optional().default([])
+      .describe("IDs des nœuds de contexte pour améliorer la pertinence"),
+    includePending: z.boolean().optional().default(false)
+      .describe("Inclure les nœuds en attente d'intégration (integrationStatus: 'pending')"),
+    limit: z.number().int().optional().default(10)
+      .describe("Nombre maximum de résultats à retourner")
+});
+
+const batchOperationsToolSchema = z.object({
+    operations: z.array(z.object({
+      tool: z.string().describe("Nom de l'outil MCP à exécuter (ex: createNode, createRelationship)"),
+      params: z.any().describe("Paramètres spécifiques à l'outil invoqué")
+    })).describe("Liste des opérations à exécuter en lot."),
+    transactional: z.boolean().optional().default(true).describe("Si true, toutes les opérations sont exécutées dans une seule transaction.")
+});
+
 // --- Outils de Graph Tools ---
 const queryGraphToolSchema = z.object({
     query: z.string().describe("Requête Cypher à exécuter"),
@@ -362,6 +381,11 @@ const readerTools: Record<string, Tool<any, any>> = {
         parameters: searchNodesByTextToolSchema,
         execute: async (args) => executeMcpToolForAgent('searchNodesByText', args)
     }),
+    searchWithContext: tool({
+        description: "Recherche des nœuds basée sur une requête textuelle avec contexte conversationnel optionnel pour améliorer la pertinence.",
+        parameters: searchWithContextToolSchema,
+        execute: async (args) => executeMcpToolForAgent('searchWithContext', args)
+    }),
 };
 
 const integratorTools: Record<string, Tool<any, any>> = {
@@ -380,6 +404,7 @@ const integratorTools: Record<string, Tool<any, any>> = {
     deleteNode: tool({ description: "Supprime un nœud du graphe.", parameters: deleteNodeToolSchema, execute: async (args) => executeMcpToolForAgent('deleteNode', args) }),
     addSchemaElement: tool({ description: "Ajoute un nouvel élément (tag ou type de relation) au catalogue externe.", parameters: addSchemaElementToolSchema, execute: async (args) => executeMcpToolForAgent('addSchemaElement', args) }),
     updateGraph: tool({ description: "Exécute une requête Cypher de modification complexe.", parameters: updateGraphToolSchema, execute: async (args) => executeMcpToolForAgent('updateGraph', args) }),
+    batchOperations: tool({ description: "Exécute plusieurs opérations en une transaction atomique.", parameters: batchOperationsToolSchema, execute: async (args) => executeMcpToolForAgent('batchOperations', args) }),
 };
 
 
