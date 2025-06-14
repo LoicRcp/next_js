@@ -13,7 +13,7 @@ import { NextResponse } from 'next/server';
 // NE PLUS IMPORTER getMcpClient ici, car l'orchestrateur ne l'utilise pas directement
 // import { getMcpClient } from '@/lib/mcp-client';
 // Importer les fonctions d'appel des agents spécialisés
-import { executeReaderAgentCall, executeIntegratorAgentCall } from '@/lib/agent-caller';
+import { executeSearch, executeAddOrUpdate } from '@/lib/agent-caller';
 import fs from 'fs';
 import path from 'path';
 
@@ -41,17 +41,15 @@ const ORCHESTRATOR_SYSTEM_PROMPT = fs.readFileSync(
   'utf-8'
 );
 
-// --- Schémas Zod pour les OUTILS DE L'ORCHESTRATEUR ---
+// --- Schémas Zod pour les OUTILS DE HAUT NIVEAU DE L'ORCHESTRATEUR ---
 // Ces outils appellent les fonctions dans agent-caller.ts
 
-const callReaderAgentSchema = z.object({
-  taskDescription: z.string().describe("Description claire et détaillée de la tâche de lecture ou de recherche à effectuer par l'Agent Lecteur."),
-  // Ajoute d'autres champs si l'Orchestrateur doit passer plus de contexte
+const searchKnowledgeGraphSchema = z.object({
+  query: z.string().describe("La question ou le sujet de recherche de l'utilisateur en langage naturel.")
 });
 
-const callIntegratorAgentSchema = z.object({
-  taskDescription: z.string().describe("Description claire et détaillée de la tâche d'intégration (création ou modification de données) à effectuer par l'Agent Intégrateur."),
-  // Ajoute d'autres champs si l'Orchestrateur doit passer plus de contexte
+const addOrUpdateKnowledgeSchema = z.object({
+  information: z.string().describe("Une description textuelle complète et détaillée de l'information à ajouter ou à mettre à jour.")
 });
 
 // TODO: Ajouter les schémas pour callRestructuratorAgent et callExternalAgent si nécessaire
@@ -71,32 +69,32 @@ export async function POST(req: Request) {
     // --- Création de l'objet 'availableTools' pour l'ORCHESTRATEUR ---
     // Déplacé ici pour avoir accès à integrationBatchId et chatId
     const availableTools: Record<string, Tool<any, any>> = {
-      callReaderAgent: tool({
-        description: "Délègue une tâche de lecture ou de recherche d'informations dans le graphe de connaissances à l'Agent Lecteur spécialisé.",
-        parameters: callReaderAgentSchema,
+      searchKnowledgeGraph: tool({
+        description: "Recherche et récupère des informations existantes dans le graphe de connaissances. À utiliser lorsque l'utilisateur demande à consulter, lister ou vérifier des informations.",
+        parameters: searchKnowledgeGraphSchema,
         execute: async (args) => {
-          console.log(`[Orchestrator Tool] Calling executeReaderAgentCall with:`, args);
+          console.log(`[Orchestrator Tool] Calling executeSearch with:`, args);
           // Appelle la fonction importée depuis agent-caller.ts
-          const result = await executeReaderAgentCall({
-            ...args,
+          const result = await executeSearch({
+            query: args.query,
             integrationBatchId: integrationBatchId,
             chatId: chatId
           });
-          console.log(`[Orchestrator Tool] Result from executeReaderAgentCall:`, result);
+          console.log(`[Orchestrator Tool] Result from executeSearch:`, result);
           return result;
         }
       }),
-      callIntegratorAgent: tool({
-        description: "Délègue une tâche de création ou de modification d'informations (préparation pour intégration) dans le graphe de connaissances à l'Agent Intégrateur spécialisé.",
-        parameters: callIntegratorAgentSchema,
+      addOrUpdateKnowledge: tool({
+        description: "Ajoute de nouvelles informations ou met à jour des informations existantes dans le graphe. À utiliser lorsque l'utilisateur fournit de nouvelles données, des faits, des décisions ou des mises à jour.",
+        parameters: addOrUpdateKnowledgeSchema,
         execute: async (args) => {
-          console.log(`[Orchestrator Tool] Calling executeIntegratorAgentCall with:`, args);
-          const result = await executeIntegratorAgentCall({
-            ...args,
+          console.log(`[Orchestrator Tool] Calling executeAddOrUpdate with:`, args);
+          const result = await executeAddOrUpdate({
+            information: args.information,
             integrationBatchId: integrationBatchId,
             chatId: chatId
           });
-          console.log(`[Orchestrator Tool] Result from executeIntegratorAgentCall:`, result);
+          console.log(`[Orchestrator Tool] Result from executeAddOrUpdate:`, result);
           return result;
         }
       }),
