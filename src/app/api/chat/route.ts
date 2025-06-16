@@ -1,143 +1,77 @@
-// next_js/src/app/api/chat/route.ts
-import { google } from '@ai-sdk/google';
-import {
-  streamText,
-  tool,
-  type CoreMessage,
-  type Tool,
-  type ToolCall, // Gardé au cas où, mais moins utilisé directement ici
-  type ToolExecutionOptions, // Gardé au cas où
-} from 'ai';
-import { z } from 'zod';
+// Route API optimisée avec reasoning et patterns Vercel AI SDK
+import { KnowledgeHubOrchestrator } from '@/lib/orchestration/KnowledgeHubOrchestrator';
 import { NextResponse } from 'next/server';
-// NE PLUS IMPORTER getMcpClient ici, car l'orchestrateur ne l'utilise pas directement
-// import { getMcpClient } from '@/lib/mcp-client';
-// Importer les fonctions d'appel des agents spécialisés
-import { executeSearch, executeAddOrUpdate } from '@/lib/agent-caller';
-import fs from 'fs';
-import path from 'path';
+import type { CoreMessage, StreamTextResult } from 'ai';
 
-// --- Configuration ---
-const geminiModelId = process.env.GEMINI_MODEL_ID || 'gemini-1.5-flash';
-const googleApiKeyEnvVar = 'GOOGLE_GENERATIVE_AI_API_KEY';
-
-if (!process.env[googleApiKeyEnvVar]) {
-  console.warn(`\n[Startup Warning] Environment variable ${googleApiKeyEnvVar} is not set. Google AI calls might fail.`);
-}
-
-// --- Prompt Système de l'Agent Orchestrateur ---
-// (Utilise le prompt complet de Obsidian/Prompts/Agent Orchestrateur.md)
-
-const ORCHESTRATOR_SYSTEM_PROMPT = fs.readFileSync(
-  path.resolve(
-    process.cwd(),
-    '..',
-    'docs',
-    'KnowledgeHub',
-    'Obsidian',
-    'Prompts',
-    'Agent Orchestrateur.md'
-  ),
-  'utf-8'
-);
-
-// --- Schémas Zod pour les OUTILS DE HAUT NIVEAU DE L'ORCHESTRATEUR ---
-// Ces outils appellent les fonctions dans agent-caller.ts
-
-const searchKnowledgeGraphSchema = z.object({
-  query: z.string().describe("La question ou le sujet de recherche de l'utilisateur en langage naturel.")
+// Créer une instance unique de l'orchestrateur
+const orchestrator = new KnowledgeHubOrchestrator({
+  enableReasoning: true,
+  maxSteps: 7,
+  streamByDefault: true
 });
 
-const addOrUpdateKnowledgeSchema = z.object({
-  information: z.string().describe("Une description textuelle complète et détaillée de l'information à ajouter ou à mettre à jour.")
-});
-
-// TODO: Ajouter les schémas pour callRestructuratorAgent et callExternalAgent si nécessaire
-
-
-// --- Route Handler POST (Logique principale) ---
 export async function POST(req: Request) {
+  const startTime = Date.now();
+  
   try {
-    console.log("\n--- [API Route] Received POST request ---");
+    console.log("\n=== [API Route] New request received ===");
+    
+    const { messages, chatId }: { 
+      messages: CoreMessage[], 
+      chatId?: string 
+    } = await req.json();
 
-    const { messages, chatId }: { messages: CoreMessage[], chatId?: string } = await req.json();
     if (!messages || messages.length === 0) {
-      return NextResponse.json({ error: "No messages provided" }, { status: 400 });
+      return NextResponse.json(
+        { error: "No messages provided" }, 
+        { status: 400 }
+      );
     }
-    const integrationBatchId = chatId ? `batch_${chatId}_${Date.now()}` : undefined;
 
-    // --- Création de l'objet 'availableTools' pour l'ORCHESTRATEUR ---
-    // Déplacé ici pour avoir accès à integrationBatchId et chatId
-    const availableTools: Record<string, Tool<any, any>> = {
-      searchKnowledgeGraph: tool({
-        description: "Recherche et récupère des informations existantes dans le graphe de connaissances. À utiliser lorsque l'utilisateur demande à consulter, lister ou vérifier des informations.",
-        parameters: searchKnowledgeGraphSchema,
-        execute: async (args) => {
-          console.log(`[Orchestrator Tool] Calling executeSearch with:`, args);
-          // Appelle la fonction importée depuis agent-caller.ts
-          const result = await executeSearch({
-            query: args.query,
-            integrationBatchId: integrationBatchId,
-            chatId: chatId
-          });
-          console.log(`[Orchestrator Tool] Result from executeSearch:`, result);
-          return result;
-        }
-      }),
-      addOrUpdateKnowledge: tool({
-        description: "Ajoute de nouvelles informations ou met à jour des informations existantes dans le graphe. À utiliser lorsque l'utilisateur fournit de nouvelles données, des faits, des décisions ou des mises à jour.",
-        parameters: addOrUpdateKnowledgeSchema,
-        execute: async (args) => {
-          console.log(`[Orchestrator Tool] Calling executeAddOrUpdate with:`, args);
-          const result = await executeAddOrUpdate({
-            information: args.information,
-            integrationBatchId: integrationBatchId,
-            chatId: chatId
-          });
-          console.log(`[Orchestrator Tool] Result from executeAddOrUpdate:`, result);
-          return result;
-        }
-      }),
-      // TODO: Ajouter les outils callRestructuratorAgent et callExternalAgent ici
-    };
-
-    console.log(`[API Route] Processing ${messages.length} messages for Orchestrator.`);
-
-    // Pas besoin de vérifier le client MCP ici directement
-
-    console.log(`[API Route] Calling Google AI model '${geminiModelId}' for Orchestrator...`);
-    const result = await streamText({
-      model: google(geminiModelId),
-      system: ORCHESTRATOR_SYSTEM_PROMPT, // Utiliser le prompt de l'Orchestrateur
-      messages,
-      tools: availableTools, // Utiliser les outils de délégation
-
-      onFinish: ({ finishReason, usage }) => {
-          console.log(`[API Route - Orchestrator] Stream finished. Reason: ${finishReason}`);
-          console.log(`[API Route - Orchestrator] Token Usage: Input=${usage.promptTokens}, Output=${usage.completionTokens}, Total=${usage.totalTokens}`);
-      },
-      onError: (error) => {
-         console.error("[API Route - Orchestrator] Error during streamText processing:", error);
-      }
+    console.log(`[API Route] Processing ${messages.length} messages for chat: ${chatId || 'anonymous'}`);
+    
+    // Déléguer le traitement à l'orchestrateur optimisé
+    const result = await orchestrator.processRequest(messages, chatId);
+    
+    // Si c'est un stream, le retourner directement
+    if (result && 'toDataStreamResponse' in result && typeof result.toDataStreamResponse === 'function') {
+      console.log(`[API Route] Streaming response (${Date.now() - startTime}ms)`);
+      return (result as StreamTextResult<any, any>).toDataStreamResponse();
+    }
+    
+    // Si c'est un generateText result, formater la réponse
+    console.log(`[API Route] Returning generated response (${Date.now() - startTime}ms)`);
+    return NextResponse.json({
+      content: result.text,
+      usage: result.usage,
+      reasoning: result.reasoning
     });
 
-    console.log("[API Route] Streaming Orchestrator response back to client...");
-    return result.toDataStreamResponse();
-
   } catch (error: any) {
-    console.error(`[API Route Error - ${new Date().toISOString()}] Unhandled Error in Orchestrator route:`);
-    console.error("  Message:", error.message);
-    if (process.env.NODE_ENV !== 'production') {
-        console.error("  Stack:", error.stack);
-    } else {
-         console.error("  (Stack trace hidden in production)");
+    const duration = Date.now() - startTime;
+    console.error(`[API Route Error] After ${duration}ms:`, error.message);
+    
+    // Gestion d'erreur améliorée
+    if (error.name === 'AI_RateLimitError') {
+      return NextResponse.json(
+        { error: "Rate limit exceeded. Please try again later." },
+        { status: 429 }
+      );
     }
-    // L'erreur peut provenir de l'appel à executeReader/IntegratorAgentCall
-    const detail = error.message || "An internal server error occurred.";
-
+    
+    if (error.name === 'AI_APICallError') {
+      return NextResponse.json(
+        { error: "AI service temporarily unavailable." },
+        { status: 503 }
+      );
+    }
+    
     return NextResponse.json(
-      { error: "An internal server error occurred.", details: detail },
-      { status: 500, statusText: "Internal Server Error" }
+      { 
+        error: "An internal server error occurred.", 
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      },
+      { status: 500 }
     );
   }
 }
