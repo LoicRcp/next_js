@@ -1,97 +1,135 @@
-# Knowledge Hub - IA Personal Knowledge Management
+# Knowledge Hub - Gestionnaire de Connaissances IA 🧠
 
-## À propos du projet
+### *ReadMe généré par IA se basant sur la documentation & le code frontend*
 
-Knowledge Hub est un système de gestion des connaissances personnelles alimenté par l'IA, conçu pour centraliser, connecter et analyser des informations provenant de diverses sources. L'application permet aux utilisateurs d'interagir avec leurs données via une interface conversationnelle et de visualiser leurs connaissances sur un tableau de bord personnalisable.
 
-![Knowledge Hub Dashboard](https://via.placeholder.com/800x450/1a1a1a/888888?text=Knowledge+Hub+Dashboard)
+## Vue d'ensemble
 
-## Fonctionnalités principales
+Knowledge Hub est un système avancé de gestion des connaissances personnelles qui révolutionne la façon dont vous stockez, organisez et explorez vos informations. Contrairement aux outils traditionnels qui traitent les données de manière isolée, Knowledge Hub utilise une **architecture multi-agents IA** et une **base de données graphe** pour créer un écosystème de connaissances véritablement interconnecté.
 
-- **Interface conversationnelle** : Interagissez avec l'IA pour ajouter, interroger et analyser vos connaissances
-- **Tableau de bord personnalisable** : Créez et organisez des widgets pour visualiser vos données
-- **Structure en graphe** : Stockage des données dans une base de données Neo4j pour préserver les relations entre les informations
-- **Intégration d'outils externes** (à venir) : Connectez vos données depuis Notion, Google Calendar, services d'email, etc.
-- **Visualisations dynamiques** : Affichez vos données sous forme de graphiques, tableaux et autres représentations visuelles
+### 🎯 Vision du projet
 
-## Stack technologique
+Transformer la gestion des connaissances personnelles en passant d'un stockage statique à un **système vivant** qui :
+- **Comprend** le contexte et les relations entre vos informations
+- **Suggère** des connexions que vous n'auriez pas vues
+- **Évolue** avec vos habitudes et besoins
+- **Facilite** la découverte de patterns et d'insights
 
-- **Frontend** : Next.js 15 avec React 18
-- **Styling** : Tailwind CSS avec Shadcn/ui
-- **Graphiques** : Recharts pour les visualisations de données
-- **Tableau de bord** : react-grid-layout pour les widgets glisser-déposer
-- **Base de données** : Neo4j (base de données graphe)
-- **IA** : API Anthropic Claude
-- **Communication IA <-> Données** : Model Context Protocol (MCP)
+## ✨ Fonctionnalités clés
 
-## Prérequis
+### 🤖 Interface conversationnelle intelligente
+- Posez des questions en langage naturel à votre base de connaissances
+- L'IA comprend le contexte et maintient une conversation cohérente
+- Ajoutez des informations simplement en parlant avec l'assistant
 
-- Node.js (v18+)
-- Neo4j Database (v5+)
-- Clé API Anthropic Claude
+### 🕸️ Graphe de connaissances
+- Stockage des données sous forme de **nœuds** (entités) et **relations** (connexions)
+- Découverte automatique de liens entre vos informations
+- Navigation intuitive dans votre réseau de connaissances
 
-## Installation
+### 📊 Tableau de bord personnalisable
+- Widgets drag & drop pour visualiser vos données
+- Graphiques de croissance de vos connaissances
+- Tableaux de données configurables
+- Interface modulaire et extensible
 
-1. Clonez le dépôt
+### 🔄 Architecture multi-agents
+- **Agent Orchestrateur** : Coordonne les interactions et comprend vos demandes
+- **Agent Lecteur** : Expert en exploration et recherche dans le graphe
+- **Agent Intégrateur** : Spécialiste de l'ajout et de la structuration des données
+- **Agent Restructurateur** : Maintient la qualité et optimise le graphe
+
+## 🛠️ Technologies utilisées
+
+### Frontend & Interface
+- **Next.js 15** avec App Router - Framework React moderne
+- **TypeScript** - Typage statique pour une meilleure robustesse
+- **Tailwind CSS v4** - Framework CSS utilitaire
+- **Shadcn/ui** - Composants UI modernes et accessibles
+- **Framer Motion** - Animations fluides et interactives
+
+### IA & Communication
+- **Vercel AI SDK** - Intégration IA streamlinée
+- **Anthropic Claude** - Modèle de langage pour l'orchestrateur
+- **Model Context Protocol (MCP)** - Communication entre IA et données
+- **Architecture multi-agents** - Spécialisation des rôles IA
+
+### Données & Backend
+- **Neo4j** - Base de données graphe pour les relations complexes
+- **Recharts** - Visualisations de données interactives
+- **React Grid Layout** - Dashboard drag & drop personnalisable
+
+### Développement
+- **ESLint** - Linting et bonnes pratiques
+- **TypeScript** - Types stricts pour la fiabilité
+- **Zod** - Validation des données runtime
+
+## 👩‍💻 Pour les développeurs
+
+### Structure du code
+
+```
+src/
+├── app/                     # Pages Next.js (App Router)
+│   ├── api/chat/           # API pour les conversations IA
+│   ├── chat/               # Interface de chat
+│   └── page.tsx            # Page d'accueil avec dashboard
+├── components/             
+│   ├── chat/               # Composants interface conversationnelle
+│   │   ├── ChatInterface.tsx        # Composant principal (refactorisé)
+│   │   └── components/              # Sous-composants modulaires
+│   │       ├── MessageComponent.tsx # Affichage des messages
+│   │       ├── ChatInput.tsx        # Zone de saisie
+│   │       ├── MessagesDisplay.tsx  # Liste des messages
+│   │       └── MarkdownContent.tsx  # Rendu Markdown
+│   ├── dashboard/          # Système de widgets personnalisables
+│   │   ├── Dashboard.tsx           # Orchestrateur du dashboard
+│   │   └── widgets/                # Widgets disponibles
+│   └── ui/                 # Composants UI réutilisables (Shadcn)
+└── lib/
+    ├── orchestration/      # Logique multi-agents
+    ├── reasoning/          # Wrapper de raisonnement IA
+    └── utils/              # Utilitaires partagés
+```
+
+### Concepts clés du code
+
+#### Architecture multi-agents
+- **Orchestrateur** (`KnowledgeHubOrchestrator`) : Point d'entrée qui coordonne
+- **Agents spécialisés** : Chacun avec un rôle précis (lecture, écriture, analyse)
+- **Communication** : Via descriptions de tâches en langage naturel
+
+#### Composants modulaires
+- **ChatInterface** refactorisé en sous-composants pour la maintenabilité
+- **Widgets** avec système de configuration flexible
+- **Hooks personnalisés** pour la logique métier
+
+### Scripts disponibles
+
 ```bash
-git clone [url-du-repo]
-cd knowledge-hub/next_js
+npm run dev      # Développement avec hot reload
+npm run build    # Build de production
+npm run start    # Démarrage du build de production
+npm run lint     # Vérification du code avec ESLint
 ```
 
-2. Installez les dépendances
-```bash
-npm install
-```
+## 🗺️ Roadmap et état du projet
 
-3. Configurez les variables d'environnement
-```
-# Créez un fichier .env.local avec les variables suivantes
-ANTHROPIC_API_KEY=votre_clé_api_claude
-NEO4J_URI=bolt://localhost:7687
-NEO4J_USER=neo4j
-NEO4J_PASSWORD=votre_mot_de_passe
-```
+### Statut actuel : **Prototype fonctionnel** 🚧
 
-4. Lancez le serveur de développement
-```bash
-npm run dev
-```
+Le projet est dans une phase de développement active avec les fonctionnalités de base opérationnelles :
 
-5. Ouvrez [http://localhost:3000](http://localhost:3000) dans votre navigateur
+- ✅ **Interface conversationnelle** : Chat IA fonctionnel avec streaming
+- ✅ **Architecture multi-agents** : Orchestrateur et agents spécialisés
+- ✅ **Dashboard personnalisable** : Widgets drag & drop
+- ✅ **Base technique solide** : Next.js, TypeScript, composants modulaires
+- ✅ **Intégration Neo4j** : En cours de finalisation
+- 🔄 **Outils MCP** : Server et protocoles de communication
 
-## Structure du projet
+### Prochaines étapes
 
-```
-next_js/
-├── public/               # Assets statiques
-├── src/
-│   ├── app/              # Pages de l'application (App Router)
-│   ├── components/       # Composants React réutilisables
-│   │   ├── charts/       # Composants de visualisation
-│   │   ├── dashboard/    # Système de tableau de bord et widgets
-│   │   ├── demo/         # Composants de démonstration
-│   │   └── ui/           # Composants UI réutilisables (Shadcn)
-│   └── lib/              # Utilitaires et hooks
-└── ...
-```
-
-## Roadmap
-
-Le développement suit une approche itérative divisée en plusieurs phases :
-
-- ✅ **Phase 0** : Préparation et design initial
-- 🔄 **Phase 1** : Fondation technique et interaction de base
-- 🔄 **Phase 2** : Fonctionnalités conversationnelles et graphe avancées
-- 🔄 **Phase 3** : Intégration des sources externes
-- 🔜 **Phase 4** : Widgets avancés et personnalisation UI
-- 🔜 **Phase 5** : Raffinement, tests et déploiement
-
-Consultez le document de roadmap complet pour plus de détails.
-
-## Contribution
-
-Les contributions sont les bienvenues ! Veuillez suivre les bonnes pratiques décrites dans la documentation technique.
-
-## Licence
-
-[Type de licence]
+1. **Phase 1** : Stabilisation du système multi-agents
+2. **Phase 2** : Enrichissement des capacités de graphe
+3. **Phase 3** : Intégrations externes (Notion, Gmail, etc.)
+4. **Phase 4** : Widgets métier spécialisés
+5. **Phase 5** : Optimisations et déploiement
